@@ -1,0 +1,8 @@
+{
+    "sketch": "niktab.ino",
+    "board": "arduino:avr:pro",
+    "output": "build",
+    "programmer": "Parallel Programmer",
+    "port": "/dev/ttyUSB0",
+    "configuration": "cpu=16MHzatmega328"
+}

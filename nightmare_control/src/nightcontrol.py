@@ -19,6 +19,7 @@ from radial_bar import RadialBar
 from joystick import Joystick
 
 js = serial.Serial('/dev/ttyCOSO0', 115200)
+hc = serial.Serial('/dev/ttyCOSO1', 9600)
 
 current_buf = []
 for _ in range(200):
@@ -55,10 +56,26 @@ def joystick_listener(viz):
                     x2 = np.sin(np.radians(angle2))*speed2
                     y2 = np.cos(np.radians(angle2))*speed2
                         
-                    viz.draw_joystick(x1, x2, y1, y2)
+                    viz.draw_joystick(x1, y1, x2, y2)
+                    send_data(x2, y2, x1, y1)
                 time.sleep(0.01)
-            
-def fmap(x, in_min, in_max, out_min, out_max):                                                     #simple linear interpolation function
+
+def send_data(lx, ly, rx, ry):
+    clamp = lambda n, minn, maxn: max(min(maxn, n), minn)
+    hc.write(0x55)
+    hc.write(0x55)
+    _lx = clamp(round((lx*255)-127),0,255)
+    _ly = clamp(round((ly*255)-127),0,255)
+    _rx = clamp(round((rx*255)-127),0,255)
+    _ry = clamp(round((ry*255)-127),0,255)
+    hc.write(_lx)
+    hc.write(_ly)
+    hc.write(_rx)
+    hc.write(_ry)
+    checksum = ((_lx + _ly + _rx + _ry) >> 8) & 0xFF
+    hc.write(checksum)
+
+def fmap(x, in_min, in_max, out_min, out_max):            #simple linear interpolation function
   return (float)(x - in_min) * (out_max - out_min) / (float)(in_max - in_min) + out_min
 
                 

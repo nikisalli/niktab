@@ -64,14 +64,15 @@ def send_data(lx, ly, rx, ry):
     clamp = lambda n, minn, maxn: max(min(maxn, n), minn)
     hc.write(0x55)
     hc.write(0x55)
-    _lx = clamp(round((lx*255)-127),0,255)
-    _ly = clamp(round((ly*255)-127),0,255)
-    _rx = clamp(round((rx*255)-127),0,255)
-    _ry = clamp(round((ry*255)-127),0,255)
+    _lx = clamp(round((lx*127)+127),0,255) #scale -1..1 values to 0..255 
+    _ly = clamp(round((ly*127)+127),0,255)
+    _rx = clamp(round((rx*127)+127),0,255)
+    _ry = clamp(round((ry*127)+127),0,255)
     hc.write(_lx)
     hc.write(_ly)
     hc.write(_rx)
     hc.write(_ry)
+    hc.write(0)  #TODO add states
     checksum = ((_lx + _ly + _rx + _ry) >> 8) & 0xFF
     hc.write(checksum)
 

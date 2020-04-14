@@ -101,8 +101,8 @@ def hc12_writer():
         _checksum = (_checksum >> 8) & 0xFF
         
         if(_checksum == buf[2]):
-            voltage = fmap(buf[0], 0, 255, 0, 9)
-            current = fmap(buf[1], 0, 255, 0, 12)
+            voltage = fmap(buf[0], 0, 255, 0, 9) #scale voltage to get value in volts
+            current = fmap(buf[1], 0, 255, 0, 12) #scale current to get value in amperes
             myviz.batteryVWidget.value = voltage #store in global vars for widgets to read
             buf_curr[0].append(current) 
             

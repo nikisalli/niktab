@@ -68,9 +68,9 @@ def hc12_writer():
         global buf_x1, buf_x2, buf_y1, buf_y2, buf_curr
         hc.write(HEADER)
         _lx = round(fmap(buf_x1,-1,1,0,255)) #scale -1..1 values to 0..255 
-        _ly = round(fmap(buf_x1,-1,1,0,255))
-        _rx = round(fmap(buf_x1,-1,1,0,255))
-        _ry = round(fmap(buf_x1,-1,1,0,255))
+        _ly = round(fmap(buf_y1,-1,1,0,255))
+        _rx = round(fmap(buf_x2,-1,1,0,255))
+        _ry = round(fmap(buf_y2,-1,1,0,255))
         hc.write(_lx)
         hc.write(_ly)
         hc.write(_rx)

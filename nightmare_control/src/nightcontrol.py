@@ -19,6 +19,7 @@ from radial_bar import RadialBar
 from joystick import Joystick
 
 js = serial.Serial('/dev/ttyCOSO0', 115200)
+hc = serial.Serial('/dev/ttyCOSO1', 9600)
 
 current_buf = []
 for _ in range(200):
@@ -28,13 +29,14 @@ time_buf = []
 for i in range(200):
     time_buf.append(i)
 
-buf = [current_buf, time_buf]
-buf_x1 = []
-buf_y1 = []
-buf_x2 = []
-buf_y2 = []
+buf_curr = [current_buf, time_buf]
+buf_x1 = 0
+buf_y1 = 0
+buf_x2 = 0
+buf_y2 = 0
 
 def joystick_listener(viz):
+    global buf_x1, buf_x2, buf_y1, buf_y2, buf_curr
     while 1:
         temp = js.read(2)
         if(temp[0] == 0x55 and temp[1] == 0x55):
@@ -50,36 +52,63 @@ def joystick_listener(viz):
                     speed2 = fmap(bytes[5],0,100,0,1)
                     #button1 = bytes[6]
                     #button2 = bytes[7]
-                    x1 = np.sin(np.radians(angle1))*speed1
-                    y1 = np.cos(np.radians(angle1))*speed1
-                    x2 = np.sin(np.radians(angle2))*speed2
-                    y2 = np.cos(np.radians(angle2))*speed2
-                        
-                    viz.draw_joystick(x1, x2, y1, y2)
+                    buf_x1 = np.sin(np.radians(angle1))*speed1
+                    buf_y1 = np.cos(np.radians(angle1))*speed1
+                    buf_x2 = np.sin(np.radians(angle2))*speed2
+                    buf_y2 = np.cos(np.radians(angle2))*speed2
+                    
+                    viz.draw_joystick(buf_x1, buf_y1, buf_x2, buf_y2)
                 time.sleep(0.01)
+
+def hc12_writer():
+    while(1):
+        # write data
+        HEADER = [0x55,0x55]
+        
+        global buf_x1, buf_x2, buf_y1, buf_y2, buf_curr
+        hc.write(HEADER)
+        _lx = round(fmap(buf_x1,-1,1,0,255)) #scale -1..1 values to 0..255 
+        _ly = round(fmap(buf_y1,-1,1,0,255))
+        _rx = round(fmap(buf_x2,-1,1,0,255))
+        _ry = round(fmap(buf_y2,-1,1,0,255))
+        hc.write(_lx)
+        hc.write(_ly)
+        hc.write(_rx)
+        hc.write(_ry)
+        hc.write(0)  #TODO add states
+        checksum = ((_lx + _ly + _rx + _ry) >> 8) & 0xFF
+        hc.write(checksum)    
+        
+        #read data
+        #wait for header
+        iters = 0
+        while(iters < len(HEADER)): 
+            if(hc.in_waiting > 0):
+                if(hc.read() == HEADER[iters]):
+                    iters += 1
+                else:
+                    iters = 0
+        
+        #read
+        buf = hc.read(3)
+        
+        #calculate and compare checksum
+        _checksum = buf[0] + buf[1] 
+        
+        for x in HEADER:
+            _checksum += x
             
-def fmap(x, in_min, in_max, out_min, out_max):                                                     #simple linear interpolation function
+        _checksum = (_checksum >> 8) & 0xFF
+        
+        if(_checksum == buf[2]):
+            voltage = fmap(buf[0], 0, 255, 0, 9) #scale voltage to get value in volts
+            current = fmap(buf[1], 0, 255, 0, 12) #scale current to get value in amperes
+            myviz.batteryVWidget.value = voltage #store in global vars for widgets to read
+            buf_curr[0].append(current) 
+            
+#simple linear interpolation function
+def fmap(x, in_min, in_max, out_min, out_max):            
   return (float)(x - in_min) * (out_max - out_min) / (float)(in_max - in_min) + out_min
-
-                
-def listener():
-    rospy.init_node('nightcontrol_listener')
-    rospy.Subscriber("/nightmare/battery/voltage", Float32, callbackV)
-    rospy.Subscriber("/nightmare/battery/current", Float32, callbackC)
-
-def callbackV(data):
-    r = rospy.Rate(100)
-    voltage = round(data.data,2)
-    myviz.batteryVWidget.value = voltage
-    r.sleep()
-    
-    
-def callbackC(data):
-    r = rospy.Rate(50)
-    global buf
-    current = round(data.data,2)   
-    buf[0].append(current)
-    r.sleep()
 
 class MyViz( QtWidgets.QWidget ):
     def __init__(self):
@@ -181,13 +210,15 @@ if __name__ == '__main__':
     myviz.resize(1920, 1067)
     myviz.show()
     
-    thread = threading.Thread(target=joystick_listener, args=[myviz])
-    thread.start()
+    joystick_thread = threading.Thread(target=joystick_listener, args=[myviz])
+    joystick_thread.start()
+    
+    hc12_thread = threading.Thread(target=hc12_writer)
+    hc12_thread.start()
     
     timer = QtCore.QTimer()
-    timer.timeout.connect(lambda: myviz.grab_data(buf))
+    timer.timeout.connect(lambda: myviz.grab_data(buf_curr))
     timer.start(10)
-    
-    listener()
+
     sys.exit(app.exec_())
     rospy.spin()
